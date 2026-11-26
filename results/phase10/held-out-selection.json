@@ -1,0 +1,18 @@
+{
+  "components": [
+    "deadline-generation"
+  ],
+  "excluded": [
+    "dynamic-reserve",
+    "deadline-sensitive"
+  ],
+  "reason": "Deadline generation delivered 515/515 emergencies and reduced started qubits per delivery by 143.1 (paired 95% CI -171.7 to -114.5), with an overall delivery delta of -0.11 percentage points. Adding the queue improved low-priority expiry by 1.54 percentage points versus generation alone, but urgent delivery declined 1.35 points, exceeding the 1-point selection rule. Dynamic reserve lost 15 emergency deliveries. Keep the stabilized queue and fixed reserve.",
+  "development_evidence_sha256": {
+    "selection-rule.txt": "be30160e06f30859df3508bc7c001c4a4462cddabe31806e719e3ad7d2bb0481",
+    "reserve-development/paired_trace_intervals.csv": "2bd6e8573312a32d1416fdbbc9c18a09ceafb1204034b471165780d84b057c7b",
+    "generation-development/paired_trace_intervals.csv": "d8316a29bc73b760e1ff6b99296d4e36f4453897c7185805649e584423993060",
+    "queue-development/paired_trace_intervals.csv": "ab312995635763e629fbf95852d1c6b48393082fde4dfad061396a24096157c3",
+    "combined-development/paired_trace_intervals.csv": "0f6351f212f9e7e0e1c7e48d0920e6f2d5349544b7006e813d4904e716a9eca2",
+    "combined-development/paired_vs_deadline-generation.csv": "38242ba5305a04f81b3563fa8cd8c344c851c3d9c6e71c36cfee14528d3665de"
+  }
+}
