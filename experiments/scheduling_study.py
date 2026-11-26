@@ -15,6 +15,7 @@ from statistics import mean, stdev
 from scipy.stats import t
 
 from healthcare.requests import HealthcareRequest, Priority, RELATIVE_DEADLINE_SECONDS
+from key_management.deadline_generation import YieldObservation
 from key_management.dynamic_reserve import DynamicReserveConfig
 from key_management.replenishment import ReplenishmentConfig
 from qkd.pipeline import run_bb84_batch
@@ -59,7 +60,7 @@ CONTROLLED_POLICIES = {
         queue=policy, generation=GenerationPolicy.FIXED, reserve=1024,
         ageing=10.0 if policy == QueuePolicy.FD_QKS else None,
     )
-    for policy in QueuePolicy
+    for policy in QueuePolicy if policy != QueuePolicy.DEADLINE_SENSITIVE
 }
 
 ENGINE_CONFIG = {
@@ -179,6 +180,7 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
     if destination.exists():
         raise FileExistsError(f"choose a new output directory: {destination}")
     config = ReplenishmentConfig(**manifest["replenishment"])
+    calibration = tuple(YieldObservation(**row) for row in manifest.get("yield_calibration", ()))
     root = Path(__file__).resolve().parents[1]
     sources = [*root.glob("qkd/*.py"), *root.glob("healthcare/*.py"),
                *root.glob("key_management/*.py"), *root.glob("scheduling/*.py"),
@@ -222,6 +224,7 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
                 batch_runner=batch_runner, replenishment=config, **manifest["engine"],
                 channel_schedule=channel_schedule, initial_pool_bits=initial_pool_bits,
                 dynamic_reserve=policy.dynamic_reserve,
+                yield_calibration=calibration,
             )
             if len(result.delivered) + len(result.missed) != len(requests):
                 raise RuntimeError("request accounting failed")

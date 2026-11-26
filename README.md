@@ -124,3 +124,33 @@ and protected bits consumed at allocation.
 python -m experiments.phase10_study --split development --grouped \
   --comparison reserve --output-dir results/phase10-reserve-rerun
 ```
+
+The deadline generation candidate estimates each batch size's mean usable
+output and probability of yielding at least 256 bits. Calibration uses
+independent 4,096-qubit QBER probes and target batches from seeds 1000–1011.
+The lookup uses the latest completed batch's sampled QBER (initial prior
+1%). QBER bins are split at 0.5%, 1.5%, 3% and 5%, with ties in nearest-bin
+fallback resolved toward higher QBER. This approximates short-term
+stationarity between observations. The controller cannot see the simulated
+channel schedule or future arrivals. It ranks feasible batches by expected
+additional emergency deliveries, then additional total deliveries,
+earlier completion and lower qubit cost. Regular batches must predict at
+least 256 usable bits and a 50% chance of one key. If the channel appears
+too poor, arrived demand can trigger a large recovery probe, spaced at
+least six seconds from the previous launch. Traces separate predicted bits,
+finite-key estimated length and actual usable bits.
+
+The deadline-sensitive queue keeps emergency precedence and scores ordinary
+requests by `class + 2 × elapsed_fraction + 0.25 × min(1, waited/20)`.
+The elapsed fraction is the share of the arrival-to-deadline window used,
+with a zero-length window scored as fully elapsed. Score ties use deadline,
+arrival and request ID. The isolated queue comparison holds fixed batch
+generation and the 1,024-bit reserve constant across all five queue rules.
+
+```sh
+python -m experiments.yield_calibration --output results/yield-calibration-rerun.csv
+python -m experiments.phase10_study --split development --grouped --comparison generation \
+  --calibration results/phase10/yield-calibration.csv --output-dir results/phase10-generation-rerun
+python -m experiments.phase10_study --split development --grouped \
+  --comparison queue --output-dir results/phase10-queue-rerun
+```

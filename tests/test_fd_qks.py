@@ -57,3 +57,26 @@ def test_baselines_choose_their_documented_order(policy, expected):
     step = schedule_requests(requests, pool, now=5, policy=policy)
 
     assert [allocation.request.request_id for allocation in step.allocated] == [expected]
+
+
+def test_deadline_sensitive_queue_has_emergency_precedence_and_ordinary_urgency():
+    routine = HealthcareRequest("routine", 0, 10, Priority.ROUTINE)
+    urgent = HealthcareRequest("urgent", 9, 19, Priority.URGENT)
+    emergency = HealthcareRequest("emergency", 9, 11, Priority.EMERGENCY)
+    pool = KeyPool(1024, 256)
+    pool.replenish((0,) * 768)
+
+    result = schedule_requests(
+        [urgent, routine, emergency], pool, 10, policy=QueuePolicy.DEADLINE_SENSITIVE,
+    )
+    assert [allocation.request for allocation in result.allocated] == [emergency, routine]
+    assert result.allocated[1].queue_score > 4.0
+    assert result.allocated[1].pool_after == 256
+
+
+def test_deadline_sensitive_allows_zero_slack_request_at_its_deadline():
+    request = HealthcareRequest("urgent", 0, 0, Priority.URGENT)
+    pool = KeyPool(256)
+    pool.replenish((0,) * 256)
+    step = schedule_requests([request], pool, 0, policy=QueuePolicy.DEADLINE_SENSITIVE)
+    assert step.allocated[0].queue_score == 5.0

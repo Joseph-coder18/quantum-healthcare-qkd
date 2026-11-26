@@ -1,14 +1,16 @@
 """Run replayable Phase 10 comparisons on preassigned workload families."""
 
 import argparse
+import csv
 from dataclasses import asdict
 from pathlib import Path
 from random import Random
 
-from experiments.scheduling_study import Policy, build_manifest, run_study
+from experiments.scheduling_study import CONTROLLED_POLICIES, Policy, build_manifest, run_study
 from healthcare.requests import Priority
 from key_management.dynamic_reserve import DynamicReserveConfig
-from scheduling.simulation import ChannelCondition
+from scheduling.fd_qks import QueuePolicy
+from scheduling.simulation import ChannelCondition, GenerationPolicy
 
 
 DEVELOPMENT_SEEDS = range(2000, 2030)
@@ -75,7 +77,9 @@ def workload(scenario: str, seed: int) -> dict:
     }
 
 
-def phase10_manifest(split: str, *, grouped: bool = False, comparison: str = "baseline") -> dict:
+def phase10_manifest(
+    split: str, *, grouped: bool = False, comparison: str = "baseline", calibration: Path | None = None,
+) -> dict:
     if split == "development":
         scenarios, seeds = DEVELOPMENT, DEVELOPMENT_SEEDS
     elif split == "held-out":
@@ -92,6 +96,27 @@ def phase10_manifest(split: str, *, grouped: bool = False, comparison: str = "ba
             "fd-qks": asdict(Policy()),
             "dynamic-reserve": asdict(Policy(dynamic_reserve=DynamicReserveConfig())),
         }
+    elif comparison == "generation":
+        if calibration is None:
+            raise ValueError("the generation comparison requires a calibration CSV")
+        with calibration.open(newline="", encoding="utf-8") as source:
+            manifest["yield_calibration"] = [
+                {"qubits": int(row["qubits"]), "qber": float(row["qber"]),
+                 "usable_bits": int(row["usable_bits"])}
+                for row in csv.DictReader(source)
+            ]
+        manifest["comparison"] = "phase10-generation"
+        manifest["policies"] = {
+            "fd-qks": asdict(Policy()),
+            "fixed-generation": asdict(Policy(generation=GenerationPolicy.FIXED)),
+            "deadline-generation": asdict(Policy(generation=GenerationPolicy.DEADLINE_AWARE)),
+        }
+    elif comparison == "queue":
+        manifest["comparison"] = "controlled"
+        manifest["policies"] = {name: asdict(policy) for name, policy in CONTROLLED_POLICIES.items()}
+        manifest["policies"]["deadline-sensitive"] = asdict(Policy(
+            queue=QueuePolicy.DEADLINE_SENSITIVE, generation=GenerationPolicy.FIXED, ageing=None,
+        ))
     elif comparison != "baseline":
         raise ValueError("unknown Phase 10 comparison")
     return manifest
@@ -101,11 +126,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", choices=("development", "held-out"), required=True)
     parser.add_argument("--grouped", action="store_true")
-    parser.add_argument("--comparison", choices=("baseline", "reserve"), default="baseline")
+    parser.add_argument("--comparison", choices=("baseline", "reserve", "generation", "queue"),
+                        default="baseline")
+    parser.add_argument("--calibration", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     run_study(args.output_dir, phase10_manifest(
-        args.split, grouped=args.grouped, comparison=args.comparison,
+        args.split, grouped=args.grouped, comparison=args.comparison, calibration=args.calibration,
     ))
 
 

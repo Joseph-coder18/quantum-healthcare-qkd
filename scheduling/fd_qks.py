@@ -14,6 +14,7 @@ class QueuePolicy(StrEnum):
     FCFS = "fcfs"
     STATIC_PRIORITY = "static-priority"
     EDF = "edf"
+    DEADLINE_SENSITIVE = "deadline-sensitive"
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class Allocation:
     pool_before: int
     pool_after: int
     allocation_id: int
+    queue_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,14 @@ def effective_priority(
         return request.priority
     wait = now - request.arrival_time
     return min(Priority.URGENT, request.priority + floor(wait / ageing_interval))
+
+
+def deadline_sensitive_score(request: HealthcareRequest, now: float) -> float:
+    """Score an eligible request using class, elapsed slack and bounded wait."""
+    slack = request.deadline - request.arrival_time
+    wait = max(0.0, now - request.arrival_time)
+    urgency = min(1.0, wait / slack) if slack else 1.0
+    return request.priority + 2 * urgency + 0.25 * min(1.0, wait / 20)
 
 
 def schedule_requests(
@@ -73,6 +83,10 @@ def schedule_requests(
             return (-request.priority, *arrival_order)
         if policy == QueuePolicy.EDF:
             return (request.deadline, *arrival_order)
+        if policy == QueuePolicy.DEADLINE_SENSITIVE:
+            # Emergency precedence is independent of the ordinary score.
+            score = 0.0 if request.critical else deadline_sensitive_score(request, now)
+            return (not request.critical, -score, request.deadline, *arrival_order)
 
         priority = effective_priority(request, now, ageing_interval)
         return (-priority, request.deadline, *arrival_order)
@@ -95,6 +109,8 @@ def schedule_requests(
                 request, now, ageing_interval if policy == QueuePolicy.FD_QKS else None
             )
             allocated.append(Allocation(
-                request, now, bits, priority, before, pool.available_bits, allocation_id
+                request, now, bits, priority, before, pool.available_bits, allocation_id,
+                deadline_sensitive_score(request, now)
+                if policy == QueuePolicy.DEADLINE_SENSITIVE and not request.critical else None,
             ))
     return SchedulingStep(tuple(allocated), expired, tuple(deferred))

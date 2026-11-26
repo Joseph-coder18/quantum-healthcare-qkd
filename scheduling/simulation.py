@@ -9,6 +9,7 @@ from typing import Protocol
 
 from healthcare.encryption import decrypt_record, encrypt_record, key_from_bits
 from healthcare.requests import HealthcareRequest, Priority
+from key_management.deadline_generation import DeadlineGeneration, YieldObservation
 from key_management.dynamic_reserve import DynamicReserve, DynamicReserveConfig
 from key_management.pool import KeyPool
 from key_management.replenishment import AdaptiveReplenishment, ReplenishmentConfig
@@ -20,6 +21,7 @@ class GenerationPolicy(StrEnum):
     ADAPTIVE = "adaptive"
     FIXED = "fixed"
     DEMAND_ONLY = "demand-only"
+    DEADLINE_AWARE = "deadline-aware"
 
 
 class BatchRunner(Protocol):
@@ -70,6 +72,10 @@ class BatchTrace:
     reserve_bits: int = 0
     depolarizing_probability: float = 0.0
     interception_probability: float = 0.0
+    predicted_bits: float | None = None
+    predicted_probability_one_key: float | None = None
+    observable_qber_at_decision: float | None = None
+    recovery_probe: bool = False
 
 
 @dataclass(frozen=True)
@@ -88,6 +94,7 @@ class RequestTrace:
     allocation_id: int | None = None
     outcome_at: float | None = None
     reserve_bits_used: int = 0
+    queue_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +139,7 @@ def simulate_requests(
     channel_schedule: Sequence[ChannelCondition] = (),
     initial_pool_bits: int = 0,
     dynamic_reserve: DynamicReserveConfig | None = None,
+    yield_calibration: Sequence[YieldObservation] = (),
 ) -> SimulationResult:
     """Dispatch at integer-second ticks and account for batch generation delay."""
     if type(qubit_budget) is not int or qubit_budget < 0:
@@ -162,6 +170,10 @@ def simulate_requests(
         raise ValueError("maximum dynamic reserve must fit in the pool")
     reserve_controller = DynamicReserve(dynamic_reserve, reserve_bits) if dynamic_reserve else None
     adaptive = AdaptiveReplenishment(replenishment)
+    deadline_controller = (
+        DeadlineGeneration(yield_calibration) if generation_policy == GenerationPolicy.DEADLINE_AWARE
+        else None
+    )
     rng = Random(seed)
     initial_rng = Random(f"initial-pool:{seed}")
     pool.replenish(initial_rng.getrandbits(1) for _ in range(initial_pool_bits))
@@ -209,6 +221,8 @@ def simulate_requests(
             if size and (batch.agreement is not True or size != estimate):
                 raise RuntimeError("rejected or inconsistent batch supplied key material")
             adaptive.observe_batch(in_flight.qubits, size)
+            if deadline_controller is not None:
+                deadline_controller.observe(batch.sampled_qber)
             generated += size
             before = pool.available_bits
             admitted = pool.replenish(batch.amplified_bits)
@@ -277,6 +291,7 @@ def simulate_requests(
                 allocation.pool_before, allocation.pool_after, current_reserve,
                 allocation.allocation_id, now,
                 min(allocation.pool_before, current_reserve) - min(allocation.pool_after, current_reserve),
+                allocation.queue_score,
             ))
             consumed += request.required_key_bits
             stock_before_dispatch = allocation.pool_after
@@ -292,25 +307,29 @@ def simulate_requests(
         if in_flight is not None:
             continue
 
-        ordinary = emergency = 0
-        for request in pending:
-            if request.arrival_time <= now < request.deadline:
-                if request.critical:
-                    emergency += request.required_key_bits
-                else:
-                    ordinary += request.required_key_bits
-        desired = adaptive.choose_batch(
-            pool,
-            ordinary_demand=ordinary,
-            emergency_demand=emergency,
-            demand_only=generation_policy == GenerationPolicy.DEMAND_ONLY,
-        )
-        if desired and generation_policy == GenerationPolicy.FIXED:
-            desired = fixed_batch_qubits
-        qubits = min(desired, qubit_budget - qubits_started)
+        active = [request for request in pending if request.arrival_time <= now < request.deadline]
+        remaining_budget = qubit_budget - qubits_started
+        choice = None
+        if deadline_controller is not None:
+            choice = deadline_controller.choose(
+                pool, active, now=now, remaining_qubits=remaining_budget,
+                qubits_per_second=qubits_per_second, min_qubits=replenishment.min_qubits,
+                max_qubits=replenishment.max_qubits,
+            )
+            qubits = choice.qubits if choice else 0
+        else:
+            emergency = sum(request.required_key_bits for request in active if request.critical)
+            ordinary = sum(request.required_key_bits for request in active if not request.critical)
+            desired = adaptive.choose_batch(
+                pool, ordinary_demand=ordinary, emergency_demand=emergency,
+                demand_only=generation_policy == GenerationPolicy.DEMAND_ONLY,
+            )
+            if desired and generation_policy == GenerationPolicy.FIXED:
+                desired = fixed_batch_qubits
+            qubits = min(desired, remaining_budget)
         if qubits >= adaptive.config.min_qubits:
             finish = now + ceil(qubits / qubits_per_second)
-            if finish <= max(request.deadline for request in pending):
+            if choice is not None or finish <= max(request.deadline for request in pending):
                 qubits_started += qubits
                 in_flight = BatchTrace(
                     len(batches), rng.getrandbits(64), qubits, now, finish,
@@ -319,6 +338,10 @@ def simulate_requests(
                     reserve_bits=current_reserve,
                     depolarizing_probability=channel.depolarizing_probability,
                     interception_probability=channel.interception_probability,
+                    predicted_bits=choice.predicted_bits if choice else None,
+                    predicted_probability_one_key=choice.probability_one_key if choice else None,
+                    observable_qber_at_decision=choice.observable_qber if choice else None,
+                    recovery_probe=bool(choice and choice.recovery_probe),
                 )
 
     if in_flight is not None:
