@@ -1,0 +1,4 @@
+payload_bytes,trials,verified,tamper_rejected,median_encrypt_ns,median_decrypt_ns
+128,30,30,30,2997.5,1747.5
+1024,30,30,30,3144.0,1953.0
+16384,30,30,30,5872.0,4700.5

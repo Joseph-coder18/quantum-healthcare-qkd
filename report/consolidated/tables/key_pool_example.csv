@@ -1,0 +1,24 @@
+seconds,order,event,pool_bits,reserve_bits
+0.0,-1.0,Initial stock,1536,1024
+1.0,1.0,Delivery allocation,1280,1024
+1.0,257.0,Delivery allocation,1024,1024
+2.0,0.0,Generation completed,2361,1024
+2.0,513.0,Delivery allocation,2105,1024
+2.0,769.0,Delivery allocation,1849,1024
+2.0,1025.0,Delivery allocation,1593,1024
+2.0,1281.0,Delivery allocation,1337,1024
+4.0,0.0,Generation completed,2713,1024
+5.0,1537.0,Delivery allocation,2457,1024
+5.0,1793.0,Delivery allocation,2201,1024
+5.0,2049.0,Delivery allocation,1945,1024
+5.0,2305.0,Delivery allocation,1689,1024
+5.0,2561.0,Delivery allocation,1433,1024
+5.0,2817.0,Delivery allocation,1177,1024
+6.0,0.0,Generation completed,2522,1024
+8.0,0.0,Generation completed,3893,1024
+9.0,3073.0,Delivery allocation,3637,1024
+9.0,3329.0,Delivery allocation,3381,1024
+9.0,3585.0,Delivery allocation,3125,1024
+9.0,3841.0,Delivery allocation,2869,1024
+9.0,4097.0,Delivery allocation,2613,1024
+9.0,4353.0,Delivery allocation,2357,1024
