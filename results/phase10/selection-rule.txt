@@ -1,0 +1,6 @@
+Selection criteria fixed before combined results are read and before held-out dispatch.
+1. Prefer a configuration with no observed emergency delivery loss relative to stabilized FD-QKS on development workloads.
+2. Advance deadline generation if the upper paired 95% bound for the change in started qubits per delivery is below zero and the point estimate of the change in overall delivery is within 1 percentage point of stabilized FD-QKS. Record the expiry and wait costs.
+3. Add the deadline-sensitive queue to deadline generation only if its paired 95% upper bound on low-priority expiry change versus deadline generation alone is below zero and its urgent delivery point estimate is no more than 1 percentage point lower. The combined candidate must also meet criteria 1 and 2.
+4. Keep the fixed reserve because the isolated dynamic reserve showed a loss of emergency deliveries.
+5. Evaluate the frozen decision once on held-out outcomes. If the selected configuration loses emergency delivery or shows an unacceptable service trade-off, recommend stabilized v1 without tuning to the held-out set.

@@ -18,9 +18,10 @@ CONDITIONS = (
 )
 
 
-def measure(seeds: list[int]) -> list[dict]:
+def measure(seeds: list[int], channels: list[str] | None = None) -> list[dict]:
     rows = []
-    for seed, qubits, (channel, noise, interception) in product(seeds, SIZES, CONDITIONS):
+    conditions = [condition for condition in CONDITIONS if channels is None or condition[0] in channels]
+    for seed, qubits, (channel, noise, interception) in product(seeds, SIZES, conditions):
         for grouped in (False, True) if seed % 2 == 0 else (True, False):
             start = perf_counter()
             batch = run_bb84_batch(
@@ -41,13 +42,14 @@ def measure(seeds: list[int]) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seeds", nargs="+", type=int, default=[101, 102, 103, 104])
+    parser.add_argument("--channels", nargs="+", choices=[condition[0] for condition in CONDITIONS])
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     if args.output.exists():
         parser.error("--output must name a new file")
     if len(set(args.seeds)) != len(args.seeds):
         parser.error("seeds must be distinct")
-    write_csv(args.output, measure(args.seeds))
+    write_csv(args.output, measure(args.seeds, args.channels))
 
 
 if __name__ == "__main__":

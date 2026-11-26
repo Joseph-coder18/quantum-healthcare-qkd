@@ -52,7 +52,7 @@ def _metrics(requests: list[dict], runs: list[dict]) -> dict:
     }
 
 
-def summarize(directory: Path) -> tuple[list[dict], list[dict]]:
+def summarize(directory: Path, *, reference_policy: str = "fd-qks") -> tuple[list[dict], list[dict]]:
     requests = _read(directory / "requests.csv")
     runs = [row for row in _read(directory / "scheduling.csv") if row["priority"] == "all"]
     request_groups = defaultdict(list)
@@ -69,14 +69,16 @@ def summarize(directory: Path) -> tuple[list[dict], list[dict]]:
 
     metrics = {key: _metrics(records, run_groups.get(key, []))
                for key, records in request_groups.items()}
+    if reference_policy not in {key[2] for key in metrics}:
+        raise ValueError("reference policy is absent from the study")
     summary = [{"scenario": scenario, "policy": policy, "priority": priority, **values}
                for (scenario, seed, policy, priority), values in sorted(metrics.items())
                if seed == "pooled"]
     comparisons = defaultdict(list)
     for (scenario, seed, policy, priority), candidate in metrics.items():
-        if seed == "pooled" or policy == "fd-qks":
+        if seed == "pooled" or policy == reference_policy:
             continue
-        reference = metrics.get((scenario, seed, "fd-qks", priority), {})
+        reference = metrics.get((scenario, seed, reference_policy, priority), {})
         for metric, value in candidate.items():
             if value is not None and reference.get(metric) is not None:
                 comparisons[scenario, policy, priority, metric].append(value - reference[metric])
@@ -97,11 +99,16 @@ def summarize(directory: Path) -> tuple[list[dict], list[dict]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--reference", default="fd-qks", help="policy used for paired differences")
     args = parser.parse_args()
-    summary, intervals = summarize(args.directory)
-    write_csv(args.directory / "metrics.csv", summary)
+    summary, intervals = summarize(args.directory, reference_policy=args.reference)
+    if args.reference == "fd-qks":
+        write_csv(args.directory / "metrics.csv", summary)
+        filename = "paired_trace_intervals.csv"
+    else:
+        filename = f"paired_vs_{args.reference}.csv"
     if intervals:
-        write_csv(args.directory / "paired_trace_intervals.csv", intervals)
+        write_csv(args.directory / filename, intervals)
 
 
 if __name__ == "__main__":
