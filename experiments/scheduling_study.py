@@ -15,6 +15,7 @@ from statistics import mean, stdev
 from scipy.stats import t
 
 from healthcare.requests import HealthcareRequest, Priority, RELATIVE_DEADLINE_SECONDS
+from key_management.dynamic_reserve import DynamicReserveConfig
 from key_management.replenishment import ReplenishmentConfig
 from qkd.pipeline import run_bb84_batch
 from scheduling.fd_qks import QueuePolicy
@@ -30,6 +31,7 @@ class Policy:
     generation: GenerationPolicy = GenerationPolicy.ADAPTIVE
     reserve: int = 1024
     ageing: float | None = 10.0
+    dynamic_reserve: DynamicReserveConfig | None = None
 
 
 POLICIES = {
@@ -165,16 +167,29 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
     policies = {name: Policy(
         QueuePolicy(settings["queue"]), GenerationPolicy(settings["generation"]),
         settings["reserve"], settings["ageing"],
+        DynamicReserveConfig(**settings["dynamic_reserve"]) if settings.get("dynamic_reserve") else None,
     ) for name, settings in manifest["policies"].items()}
     if "fd-qks" not in policies:
         raise ValueError("manifest requires an fd-qks reference policy")
     if manifest["comparison"] == "controlled" and (
-        len({(policy.generation, policy.reserve) for policy in policies.values()}) != 1
+        len({(policy.generation, policy.reserve, policy.dynamic_reserve)
+             for policy in policies.values()}) != 1
     ):
         raise ValueError("controlled comparison requires shared generation and reserve settings")
     if destination.exists():
         raise FileExistsError(f"choose a new output directory: {destination}")
     config = ReplenishmentConfig(**manifest["replenishment"])
+    root = Path(__file__).resolve().parents[1]
+    sources = [*root.glob("qkd/*.py"), *root.glob("healthcare/*.py"),
+               *root.glob("key_management/*.py"), *root.glob("scheduling/*.py"),
+               *root.glob("experiments/*.py")]
+    recorded = {**manifest, "environment": {
+        "python": python_version(),
+        **{name: version(name) for name in ("qiskit", "qiskit-aer", "scipy", "cryptography")},
+        "lock_sha256": sha256((root / "requirements-lock.txt").read_bytes()).hexdigest(),
+        "source_sha256": {str(path.relative_to(root)): sha256(path.read_bytes()).hexdigest()
+                          for path in sorted(sources)},
+    }}
 
     # Reuse deterministic Aer batches when policies request the same channel,
     # seed, and batch size. Every policy is still charged its own qubit usage.
@@ -206,6 +221,7 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
                 queue_policy=policy.queue, generation_policy=policy.generation,
                 batch_runner=batch_runner, replenishment=config, **manifest["engine"],
                 channel_schedule=channel_schedule, initial_pool_bits=initial_pool_bits,
+                dynamic_reserve=policy.dynamic_reserve,
             )
             if len(result.delivered) + len(result.missed) != len(requests):
                 raise RuntimeError("request accounting failed")
@@ -225,6 +241,8 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
                     "qubit_budget": budget, "qubits_started": result.qubits_started, **qubit_costs,
                     "generated_bits": result.generated_bits, "wasted_bits": result.wasted_bits,
                     "remaining_bits": result.remaining_bits, "initial_pool_bits": initial_pool_bits,
+                    "reserve_bits_used": sum(trace.reserve_bits_used for trace in result.requests
+                                             if priority is None or trace.priority == priority.name.lower()),
                 })
         print(f"Completed {scenario}, seed {seed}", flush=True)
 
@@ -240,16 +258,6 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
         "scenario", "policy", "reference", "priority", "metric", "paired_seeds",
         "mean_delta", "lower_95", "upper_95",
     ])
-    root = Path(__file__).resolve().parents[1]
-    sources = [*root.glob("qkd/*.py"), *root.glob("healthcare/*.py"),
-               *root.glob("key_management/*.py"), *root.glob("scheduling/*.py"), Path(__file__)]
-    recorded = {**manifest, "environment": {
-        "python": python_version(),
-        **{name: version(name) for name in ("qiskit", "qiskit-aer", "scipy", "cryptography")},
-        "lock_sha256": sha256((root / "requirements-lock.txt").read_bytes()).hexdigest(),
-        "source_sha256": {str(path.resolve().relative_to(root)): sha256(path.read_bytes()).hexdigest()
-                          for path in sorted(sources)},
-    }}
     (destination / "manifest.json").write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
 
 

@@ -9,6 +9,7 @@ from typing import Protocol
 
 from healthcare.encryption import decrypt_record, encrypt_record, key_from_bits
 from healthcare.requests import HealthcareRequest, Priority
+from key_management.dynamic_reserve import DynamicReserve, DynamicReserveConfig
 from key_management.pool import KeyPool
 from key_management.replenishment import AdaptiveReplenishment, ReplenishmentConfig
 from qkd.pipeline import BB84Batch, run_bb84_batch
@@ -86,6 +87,7 @@ class RequestTrace:
     reserve_bits: int
     allocation_id: int | None = None
     outcome_at: float | None = None
+    reserve_bits_used: int = 0
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,7 @@ def simulate_requests(
     replenishment: ReplenishmentConfig = ReplenishmentConfig(),
     channel_schedule: Sequence[ChannelCondition] = (),
     initial_pool_bits: int = 0,
+    dynamic_reserve: DynamicReserveConfig | None = None,
 ) -> SimulationResult:
     """Dispatch at integer-second ticks and account for batch generation delay."""
     if type(qubit_budget) is not int or qubit_budget < 0:
@@ -155,6 +158,9 @@ def simulate_requests(
         raise ValueError("channel schedule must start at zero and have increasing start times")
 
     pool = KeyPool(pool_capacity_bits, reserve_bits)
+    if dynamic_reserve is not None and dynamic_reserve.maximum_bits > pool_capacity_bits:
+        raise ValueError("maximum dynamic reserve must fit in the pool")
+    reserve_controller = DynamicReserve(dynamic_reserve, reserve_bits) if dynamic_reserve else None
     adaptive = AdaptiveReplenishment(replenishment)
     rng = Random(seed)
     initial_rng = Random(f"initial-pool:{seed}")
@@ -183,7 +189,7 @@ def simulate_requests(
         request_traces.append(RequestTrace(
             request.request_id, request.priority.name.lower(), request.arrival_time,
             request.deadline, priority, None, None, reason, pool.available_bits,
-            pool.available_bits, reserve_bits, outcome_at=tick,
+            pool.available_bits, pool.emergency_reserve_bits, outcome_at=tick,
         ))
 
     for now in range(last_tick + 1):
@@ -222,6 +228,20 @@ def simulate_requests(
             ))
             in_flight = None
 
+        if reserve_controller is not None:
+            emergencies = [
+                request for request in pending
+                if request.critical and request.arrival_time <= now <= request.deadline
+            ]
+            replenishment_seconds = (
+                in_flight.scheduled_completion - now if in_flight is not None
+                else ceil(fixed_batch_qubits / qubits_per_second)
+            )
+            pool.set_emergency_reserve(reserve_controller.update(
+                now, arriving=sum(request.arrival_time == now for request in emergencies),
+                pending=len(emergencies), replenishment_seconds=replenishment_seconds,
+            ))
+        current_reserve = pool.emergency_reserve_bits
         stock_before_dispatch = pool.available_bits
         step = schedule_requests(
             pending, pool, now, ageing_interval=ageing_interval, policy=queue_policy
@@ -243,7 +263,7 @@ def simulate_requests(
                 allocation.pool_before - allocation.pool_after != request.required_key_bits
             ):
                 raise RuntimeError("allocation stock conservation failed")
-            if not request.critical and allocation.pool_after < reserve_bits:
+            if not request.critical and allocation.pool_after < current_reserve:
                 raise RuntimeError("ordinary allocation consumed the emergency reserve")
             key = key_from_bits(allocation.key_bits)
             envelope = encrypt_record(request.payload, key, request.request_id)
@@ -254,8 +274,9 @@ def simulate_requests(
             request_traces.append(RequestTrace(
                 request.request_id, request.priority.name.lower(), request.arrival_time,
                 request.deadline, allocation.effective_priority, allocation.time, now, None,
-                allocation.pool_before, allocation.pool_after, reserve_bits,
+                allocation.pool_before, allocation.pool_after, current_reserve,
                 allocation.allocation_id, now,
+                min(allocation.pool_before, current_reserve) - min(allocation.pool_after, current_reserve),
             ))
             consumed += request.required_key_bits
             stock_before_dispatch = allocation.pool_after
@@ -295,7 +316,7 @@ def simulate_requests(
                     len(batches), rng.getrandbits(64), qubits, now, finish,
                     pool_at_start=pool.available_bits, pool_before=pool.available_bits,
                     pool_after=pool.available_bits,
-                    reserve_bits=reserve_bits,
+                    reserve_bits=current_reserve,
                     depolarizing_probability=channel.depolarizing_probability,
                     interception_probability=channel.interception_probability,
                 )

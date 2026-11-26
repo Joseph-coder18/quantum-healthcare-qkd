@@ -5,8 +5,9 @@ from dataclasses import asdict
 from pathlib import Path
 from random import Random
 
-from experiments.scheduling_study import build_manifest, run_study
+from experiments.scheduling_study import Policy, build_manifest, run_study
 from healthcare.requests import Priority
+from key_management.dynamic_reserve import DynamicReserveConfig
 from scheduling.simulation import ChannelCondition
 
 
@@ -74,7 +75,7 @@ def workload(scenario: str, seed: int) -> dict:
     }
 
 
-def phase10_manifest(split: str, *, grouped: bool = False) -> dict:
+def phase10_manifest(split: str, *, grouped: bool = False, comparison: str = "baseline") -> dict:
     if split == "development":
         scenarios, seeds = DEVELOPMENT, DEVELOPMENT_SEEDS
     elif split == "held-out":
@@ -85,6 +86,14 @@ def phase10_manifest(split: str, *, grouped: bool = False) -> dict:
     manifest["phase10_split"] = split
     manifest["aer_execution"] = "grouped" if grouped else "original"
     manifest["workloads"] = [workload(scenario, seed) for scenario in scenarios for seed in seeds]
+    if comparison == "reserve":
+        manifest["comparison"] = "phase10-reserve"
+        manifest["policies"] = {
+            "fd-qks": asdict(Policy()),
+            "dynamic-reserve": asdict(Policy(dynamic_reserve=DynamicReserveConfig())),
+        }
+    elif comparison != "baseline":
+        raise ValueError("unknown Phase 10 comparison")
     return manifest
 
 
@@ -92,9 +101,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", choices=("development", "held-out"), required=True)
     parser.add_argument("--grouped", action="store_true")
+    parser.add_argument("--comparison", choices=("baseline", "reserve"), default="baseline")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    run_study(args.output_dir, phase10_manifest(args.split, grouped=args.grouped))
+    run_study(args.output_dir, phase10_manifest(
+        args.split, grouped=args.grouped, comparison=args.comparison,
+    ))
 
 
 if __name__ == "__main__":

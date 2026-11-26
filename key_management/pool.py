@@ -10,13 +10,8 @@ class KeyPool:
     def __init__(self, capacity_bits: int, emergency_reserve_bits: int = 0) -> None:
         if type(capacity_bits) is not int or capacity_bits <= 0:
             raise ValueError("capacity_bits must be a positive integer")
-        if (
-            type(emergency_reserve_bits) is not int
-            or not 0 <= emergency_reserve_bits <= capacity_bits
-        ):
-            raise ValueError("emergency_reserve_bits must be between zero and capacity")
         self._capacity_bits = capacity_bits
-        self._reserve_bits = emergency_reserve_bits
+        self.set_emergency_reserve(emergency_reserve_bits)
         self._bits: deque[int] = deque()
         self._allocated_bits = 0
 
@@ -40,6 +35,11 @@ class KeyPool:
     @property
     def emergency_reserve_bits(self) -> int:
         return self._reserve_bits
+
+    def set_emergency_reserve(self, bits: int) -> None:
+        if type(bits) is not int or not 0 <= bits <= self._capacity_bits:
+            raise ValueError("emergency_reserve_bits must be between zero and capacity")
+        self._reserve_bits = bits
 
     def replenish(self, bits: Iterable[int]) -> int:
         """Store as many incoming bits as fit and return the number accepted."""

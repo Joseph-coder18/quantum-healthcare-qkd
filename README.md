@@ -108,3 +108,19 @@ at 8,192 qubits (original versus grouped). The pilot supports exploratory
 grouped comparisons with the same execution mode for all paired policies.
 Four seeds leave uncertainty about the size of any distribution differences.
 The original mode remains the default for existing experiment commands.
+
+The isolated reserve experiment uses the stabilized FD-QKS scheduler and
+adaptive generation in both arms. The candidate computes
+`256 × ceil(pending emergencies + recent arrivals/8 × estimated seconds + 1)`,
+clamps it to 256–1,536 bits and updates before dispatch. The arrival rate
+uses the last eight ticks, including the current one. Estimated seconds
+come from an in-flight batch's remaining time or nominal fixed-batch
+duration when idle. Protection rises immediately and releases after three
+consecutive ticks below the current reserve. Only original emergency
+requests can spend protected bits. The trace records the effective reserve
+and protected bits consumed at allocation.
+
+```sh
+python -m experiments.phase10_study --split development --grouped \
+  --comparison reserve --output-dir results/phase10-reserve-rerun
+```
