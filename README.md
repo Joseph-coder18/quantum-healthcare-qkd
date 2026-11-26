@@ -154,3 +154,16 @@ python -m experiments.phase10_study --split development --grouped --comparison g
 python -m experiments.phase10_study --split development --grouped \
   --comparison queue --output-dir results/phase10-queue-rerun
 ```
+
+The held-out study uses the committed [development selection](results/phase10/held-out-selection.json).
+Its metrics and recommendation are in the [Phase 10 technical audit](report/Phase10_Technical_Audit.md).
+To replay the frozen selection and verify its traces:
+
+```sh
+python -m experiments.phase10_study --split held-out --grouped --comparison combined \
+  --selection results/phase10/held-out-selection.json \
+  --calibration results/phase10/yield-calibration.csv --output-dir results/phase10-held-out-rerun
+python -m experiments.verify_phase10 results/phase10-held-out-rerun
+python -m experiments.phase10_metrics results/phase10-held-out-rerun
+python -m experiments.phase10_metrics results/phase10-held-out-rerun --reference combined-v2
+```
