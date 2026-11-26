@@ -84,3 +84,27 @@ execution remains the default for studies and reproducing v1 results.
 
 All healthcare payloads are synthetic. The finite-key output measures usable
 key material under the simulation's engineering assumptions.
+
+## Phase 10 research experiments
+
+The development split uses seeds 2000–2029 across five synthetic workload
+families. The held-out split uses seeds 3000–3029 and three different workload
+families. Keep held-out data separate from configuration selection. Each
+workload in the manifest gives all policies the same requests, timing,
+synthetic initial stock, channel transitions and qubit budget. A BB84 batch
+experiences the simulated channel present at launch for its full duration.
+
+```sh
+python -m experiments.grouped_yield_validation --output results/grouped-yield-rerun.csv
+python -m experiments.phase10_study --split development --grouped --output-dir results/phase10-dev-rerun
+```
+
+The grouping pilot compared four paired seeds at 1,024, 4,096 and 8,192
+qubits under ideal, low-noise, mixed disturbance and interception conditions.
+Both modes produced identical ideal yields and zero usable bits in the tested
+mixed and interception conditions. Under 2% depolarization, mean usable
+output was 306.0 versus 316.5 bits at 4,096 qubits and 800.5 versus 870.25
+at 8,192 qubits (original versus grouped). The pilot supports exploratory
+grouped comparisons with the same execution mode for all paired policies.
+Four seeds leave uncertainty about the size of any distribution differences.
+The original mode remains the default for existing experiment commands.

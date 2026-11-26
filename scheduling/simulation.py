@@ -27,6 +27,21 @@ class BatchRunner(Protocol):
     ) -> BB84Batch: ...
 
 
+@dataclass(frozen=True)
+class ChannelCondition:
+    start: int
+    depolarizing_probability: float = 0.0
+    interception_probability: float = 0.0
+
+    def __post_init__(self) -> None:
+        if type(self.start) is not int or self.start < 0:
+            raise ValueError("channel start must be a nonnegative whole second")
+        if not all(0 <= p <= 1 for p in (
+            self.depolarizing_probability, self.interception_probability,
+        )):
+            raise ValueError("channel probabilities must be between zero and one")
+
+
 class BatchStatus(StrEnum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
@@ -52,6 +67,8 @@ class BatchTrace:
     pool_before: int = 0
     pool_after: int = 0
     reserve_bits: int = 0
+    depolarizing_probability: float = 0.0
+    interception_probability: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -110,6 +127,8 @@ def simulate_requests(
     end_time: int | None = None,
     pool_capacity_bits: int = 8192,
     replenishment: ReplenishmentConfig = ReplenishmentConfig(),
+    channel_schedule: Sequence[ChannelCondition] = (),
+    initial_pool_bits: int = 0,
 ) -> SimulationResult:
     """Dispatch at integer-second ticks and account for batch generation delay."""
     if type(qubit_budget) is not int or qubit_budget < 0:
@@ -127,10 +146,22 @@ def simulate_requests(
         raise ValueError("simulation request arrivals and deadlines must be whole seconds")
     if end_time is not None and (type(end_time) is not int or end_time < 0):
         raise ValueError("end_time must be a nonnegative integer")
+    if type(initial_pool_bits) is not int or not 0 <= initial_pool_bits <= pool_capacity_bits:
+        raise ValueError("initial_pool_bits must be a whole bit count within pool capacity")
+    if channel_schedule and (
+        channel_schedule[0].start != 0
+        or any(a.start >= b.start for a, b in zip(channel_schedule, channel_schedule[1:]))
+    ):
+        raise ValueError("channel schedule must start at zero and have increasing start times")
 
     pool = KeyPool(pool_capacity_bits, reserve_bits)
     adaptive = AdaptiveReplenishment(replenishment)
     rng = Random(seed)
+    initial_rng = Random(f"initial-pool:{seed}")
+    pool.replenish(initial_rng.getrandbits(1) for _ in range(initial_pool_bits))
+    channel = ChannelCondition(0, depolarizing_probability)
+    changes = iter(channel_schedule)
+    next_channel = next(changes, None)
     pending = sorted(requests, key=lambda request: request.arrival_time)
     delivered = []
     missed = []
@@ -156,10 +187,16 @@ def simulate_requests(
         ))
 
     for now in range(last_tick + 1):
+        if next_channel is not None and next_channel.start == now:
+            channel = next_channel
+            next_channel = next(changes, None)
         if in_flight is not None and in_flight.scheduled_completion == now:
+            disturbance = {}
+            if in_flight.interception_probability:
+                disturbance["interception_probability"] = in_flight.interception_probability
             batch = batch_runner(
                 in_flight.qubits, seed=in_flight.batch_seed,
-                depolarizing_probability=depolarizing_probability,
+                depolarizing_probability=in_flight.depolarizing_probability, **disturbance,
             )
             size = len(batch.amplified_bits)
             estimate = batch.finite_key.output_length if batch.finite_key is not None else None
@@ -259,6 +296,8 @@ def simulate_requests(
                     pool_at_start=pool.available_bits, pool_before=pool.available_bits,
                     pool_after=pool.available_bits,
                     reserve_bits=reserve_bits,
+                    depolarizing_probability=channel.depolarizing_probability,
+                    interception_probability=channel.interception_probability,
                 )
 
     if in_flight is not None:
@@ -273,8 +312,9 @@ def simulate_requests(
             unresolved.append(request)
     if qubits_started != sum(batch.qubits for batch in batches) or qubits_started > qubit_budget:
         raise RuntimeError("generation budget conservation failed")
-    if generated != consumed + wasted + pool.available_bits or (
-        sum(batch.admitted_bits for batch in batches) != consumed + pool.available_bits
+    if initial_pool_bits + generated != consumed + wasted + pool.available_bits or (
+        initial_pool_bits + sum(batch.admitted_bits for batch in batches)
+        != consumed + pool.available_bits
     ) or pool.allocated_bits != consumed:
         raise RuntimeError("key conservation failed")
     if len({trace.request_id for trace in request_traces}) != len(requests):

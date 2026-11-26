@@ -3,7 +3,7 @@
 import argparse
 import csv
 from dataclasses import asdict, dataclass, fields
-from functools import lru_cache
+from functools import lru_cache, partial
 from hashlib import sha256
 from importlib.metadata import version
 import json
@@ -19,7 +19,8 @@ from key_management.replenishment import ReplenishmentConfig
 from qkd.pipeline import run_bb84_batch
 from scheduling.fd_qks import QueuePolicy
 from scheduling.simulation import (
-    BatchRunner, BatchStatus, BatchTrace, GenerationPolicy, RequestTrace, simulate_requests,
+    BatchRunner, BatchStatus, BatchTrace, ChannelCondition, GenerationPolicy, RequestTrace,
+    simulate_requests,
 )
 
 
@@ -177,6 +178,10 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
 
     # Reuse deterministic Aer batches when policies request the same channel,
     # seed, and batch size. Every policy is still charged its own qubit usage.
+    if manifest.get("aer_execution", "original") not in {"original", "grouped"}:
+        raise ValueError("aer_execution must be original or grouped")
+    if manifest.get("aer_execution") == "grouped":
+        runner = partial(runner, grouped=True)
     batch_runner = lru_cache(maxsize=256)(runner)
     rows = []
     request_rows = []
@@ -184,6 +189,8 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
     for job in manifest["workloads"]:
         scenario, seed = job["scenario"], job["seed"]
         budget, noise = job["qubit_budget"], job["depolarizing_probability"]
+        channel_schedule = tuple(ChannelCondition(**item) for item in job.get("channel_schedule", ()))
+        initial_pool_bits = job.get("initial_pool_bits", 0)
         requests = tuple(
             HealthcareRequest(
                 item["request_id"], item["arrival_time"], item["deadline"],
@@ -198,6 +205,7 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
                 ageing_interval=policy.ageing, depolarizing_probability=noise,
                 queue_policy=policy.queue, generation_policy=policy.generation,
                 batch_runner=batch_runner, replenishment=config, **manifest["engine"],
+                channel_schedule=channel_schedule, initial_pool_bits=initial_pool_bits,
             )
             if len(result.delivered) + len(result.missed) != len(requests):
                 raise RuntimeError("request accounting failed")
@@ -216,7 +224,7 @@ def run_study(destination: Path, manifest: dict, *, runner: BatchRunner = run_bb
                     "maximum_wait_seconds": max(served) if served else "",
                     "qubit_budget": budget, "qubits_started": result.qubits_started, **qubit_costs,
                     "generated_bits": result.generated_bits, "wasted_bits": result.wasted_bits,
-                    "remaining_bits": result.remaining_bits,
+                    "remaining_bits": result.remaining_bits, "initial_pool_bits": initial_pool_bits,
                 })
         print(f"Completed {scenario}, seed {seed}", flush=True)
 

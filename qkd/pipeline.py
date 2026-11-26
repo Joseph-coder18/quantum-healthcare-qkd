@@ -28,6 +28,7 @@ def run_bb84_batch(
     sample_fraction: float = 0.25,
     depolarizing_probability: float = 0.0,
     interception_probability: float = 0.0,
+    grouped: bool = False,
 ) -> BB84Batch:
     """Return batch metrics and amplified bits for the engineering simulation."""
     if not 0 < sample_fraction < 1:
@@ -39,6 +40,7 @@ def run_bb84_batch(
         seed=rng.getrandbits(64),
         depolarizing_probability=depolarizing_probability,
         interception_probability=interception_probability,
+        grouped=grouped,
     )
     sifted_count = len(round_result.matched_positions)
     if sifted_count < 2:

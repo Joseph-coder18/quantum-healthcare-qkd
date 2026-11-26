@@ -29,3 +29,10 @@ def test_batch_without_enough_sifted_bits_produces_no_output():
 
     assert batch.sampled_qber is None
     assert batch.amplified_bits == ()
+
+
+def test_grouped_ideal_batch_matches_original_postprocessing():
+    original = run_bb84_batch(2048, seed=42)
+    grouped = run_bb84_batch(2048, seed=42, grouped=True)
+
+    assert grouped == original
