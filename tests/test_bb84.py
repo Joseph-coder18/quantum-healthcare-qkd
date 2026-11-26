@@ -124,6 +124,31 @@ def test_simulate_bb84_round_rejects_invalid_interception():
         simulate_bb84_round(1, interception_probability=1.01)
 
 
+@pytest.mark.parametrize(("noise", "interception", "expected"), [
+    (0.0, 0.0, 0.0), (0.2, 0.0, 0.10), (0.0, 1.0, 0.25),
+])
+def test_grouped_aer_preserves_position_and_channel_statistics(noise, interception, expected):
+    settings = dict(seed=42, depolarizing_probability=noise, interception_probability=interception)
+    original = simulate_bb84_round(2048, **settings)
+    grouped = simulate_bb84_round(2048, grouped=True, **settings)
+    assert grouped.alice_bits == original.alice_bits
+    assert grouped.alice_bases == original.alice_bases
+    assert grouped.bob_bases == original.bob_bases
+    assert grouped.matched_positions == original.matched_positions
+    assert grouped == simulate_bb84_round(2048, grouped=True, **settings)
+    mismatched_ones = [
+        bit for bit, a, b in zip(grouped.bob_bits, grouped.alice_bases, grouped.bob_bases)
+        if a != b
+    ]
+    assert 0.44 < sum(mismatched_ones) / len(mismatched_ones) < 0.56
+    for run in (original, grouped):
+        errors = sum(a != b for a, b in zip(run.alice_sifted_bits, run.bob_sifted_bits))
+        if expected == 0:
+            assert errors == 0
+        else:
+            assert errors / len(run.matched_positions) == pytest.approx(expected, abs=0.045)
+
+
 def test_estimate_qber_excludes_disclosed_and_unsifted_bits():
     round_result = BB84Round(
         alice_bits=(0, 1, 0, 1),

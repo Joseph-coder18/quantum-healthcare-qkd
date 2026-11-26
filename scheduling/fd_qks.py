@@ -21,6 +21,10 @@ class Allocation:
     request: HealthcareRequest
     time: float
     key_bits: tuple[int, ...] = field(repr=False)
+    effective_priority: int
+    pool_before: int
+    pool_after: int
+    allocation_id: int
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,15 @@ class SchedulingStep:
     allocated: tuple[Allocation, ...]
     expired: tuple[HealthcareRequest, ...]
     deferred: tuple[HealthcareRequest, ...]
+
+
+def effective_priority(
+    request: HealthcareRequest, now: float, ageing_interval: float | None
+) -> int:
+    if ageing_interval is None or request.critical:
+        return request.priority
+    wait = now - request.arrival_time
+    return min(Priority.URGENT, request.priority + floor(wait / ageing_interval))
 
 
 def schedule_requests(
@@ -61,10 +74,7 @@ def schedule_requests(
         if policy == QueuePolicy.EDF:
             return (request.deadline, *arrival_order)
 
-        priority = request.priority
-        if ageing_interval is not None and not request.critical:
-            wait = now - request.arrival_time
-            priority = min(Priority.URGENT, priority + floor(wait / ageing_interval))
+        priority = effective_priority(request, now, ageing_interval)
         return (-priority, request.deadline, *arrival_order)
 
     expired = tuple(request for request in requests if request.deadline < now)
@@ -75,9 +85,16 @@ def schedule_requests(
     )
     allocated = []
     for request in eligible:
+        before = pool.available_bits
+        allocation_id = pool.allocated_bits
         bits = pool.allocate(request.required_key_bits, critical=request.critical)
         if bits is None:
             deferred.append(request)
         else:
-            allocated.append(Allocation(request, now, bits))
+            priority = effective_priority(
+                request, now, ageing_interval if policy == QueuePolicy.FD_QKS else None
+            )
+            allocated.append(Allocation(
+                request, now, bits, priority, before, pool.available_bits, allocation_id
+            ))
     return SchedulingStep(tuple(allocated), expired, tuple(deferred))

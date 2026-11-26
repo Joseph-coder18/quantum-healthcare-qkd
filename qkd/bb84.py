@@ -111,6 +111,7 @@ def simulate_bb84_round(
     seed: int | None = None,
     depolarizing_probability: float = 0.0,
     interception_probability: float = 0.0,
+    grouped: bool = False,
 ) -> BB84Round:
     """Simulate and sift BB84 bits with optional depolarization and intercept-resend.
 
@@ -141,25 +142,47 @@ def simulate_bb84_round(
         intercept_resend = pauli_error(
             [("I", 1 - 2 * flip_weight), ("X", flip_weight), ("Z", flip_weight)]
         ).to_instruction()
-    circuits = []
-    for bit, alice_basis, bob_basis in zip(alice_bits, alice_bases, bob_bases):
+    configurations = tuple(zip(alice_bits, alice_bases, bob_bases))
+
+    def circuit_for(bit: int, alice_basis: str, bob_basis: str) -> QuantumCircuit:
         state = prepare_bb84_state(bit, alice_basis)
         if intercept_resend is not None:
             state.append(intercept_resend, [0])
         if channel is not None:
             state.append(channel, [0])
-        circuits.append(measure_bb84_state(state, bob_basis))
+        return measure_bb84_state(state, bob_basis)
 
     simulator = AerSimulator()
-    compiled = transpile(circuits, simulator, num_processes=1)
-    result = simulator.run(
-        compiled, shots=1, seed_simulator=random.randrange(2**32)
-    ).result()
-    if not result.success:
-        raise RuntimeError(f"BB84 simulation failed: {result.status}")
-    bob_bits = tuple(
-        int(next(iter(result.get_counts(index)))) for index in range(num_qubits)
-    )
+    if grouped:
+        positions: dict[tuple[int, str, str], list[int]] = {}
+        for index, config in enumerate(configurations):
+            positions.setdefault(config, []).append(index)
+        compiled = transpile(
+            [circuit_for(*config) for config in positions], simulator, num_processes=1
+        )
+        measurements = [0] * num_qubits
+        for circuit, indices in zip(compiled, positions.values(), strict=True):
+            # Each memory entry is an independent shot, restored to its
+            # original transmission position before sifting.
+            result = simulator.run(
+                circuit, shots=len(indices), memory=True, seed_simulator=random.randrange(2**32)
+            ).result()
+            if not result.success:
+                raise RuntimeError(f"BB84 simulation failed: {result.status}")
+            for index, bit in zip(indices, result.get_memory(), strict=True):
+                measurements[index] = int(bit)
+        bob_bits = tuple(measurements)
+    else:
+        circuits = [circuit_for(*config) for config in configurations]
+        compiled = transpile(circuits, simulator, num_processes=1)
+        result = simulator.run(
+            compiled, shots=1, seed_simulator=random.randrange(2**32)
+        ).result()
+        if not result.success:
+            raise RuntimeError(f"BB84 simulation failed: {result.status}")
+        bob_bits = tuple(
+            int(next(iter(result.get_counts(index)))) for index in range(num_qubits)
+        )
 
     return BB84Round(
         alice_bits, bob_bits, alice_bases, bob_bases, sift_positions(alice_bases, bob_bases)

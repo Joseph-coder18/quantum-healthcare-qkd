@@ -1,25 +1,24 @@
 """Measure simulated BB84 correctness, disturbance, yield, and AES delivery."""
 
-import csv
+import argparse
 from dataclasses import replace
 from pathlib import Path
 from time import perf_counter_ns
 
 from cryptography.exceptions import InvalidTag
 
+from experiments.scheduling_study import write_csv
 from healthcare.encryption import decrypt_record, encrypt_record
 from qkd.bb84 import simulate_bb84_round
 from qkd.pipeline import run_bb84_batch
 
 
-def save_rows(path: Path, rows: list[dict]) -> None:
-    with path.open("w", encoding="utf-8", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-
-
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, required=True, help="new output directory")
+    destination = parser.parse_args().output_dir
+    if destination.exists():
+        parser.error("--output-dir must name a new directory")
     correctness = []
     protocol = []
     for seed in (42, 43, 44):
@@ -58,8 +57,6 @@ def main() -> None:
                 "amplified_bits": len(batch.amplified_bits),
             })
         print(f"Completed BB84 seed {seed}", flush=True)
-    save_rows(Path("results/bb84_correctness.csv"), correctness)
-    save_rows(Path("results/bb84_channel_and_yield.csv"), protocol)
 
     encryption = []
     for size in (128, 1024, 16384):
@@ -86,7 +83,10 @@ def main() -> None:
                 "tamper_rejected": tamper_rejected, "encrypt_ns": encrypted_at - start,
                 "decrypt_ns": decrypted_at - encrypted_at,
             })
-    save_rows(Path("results/encryption.csv"), encryption)
+    destination.mkdir(parents=True)
+    write_csv(destination / "bb84_correctness.csv", correctness)
+    write_csv(destination / "bb84_channel_and_yield.csv", protocol)
+    write_csv(destination / "encryption.csv", encryption)
 
 
 if __name__ == "__main__":

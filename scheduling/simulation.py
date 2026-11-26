@@ -1,7 +1,7 @@
 """Timed scheduling of synthetic requests and asynchronous BB84 batches."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from math import ceil
 from random import Random
@@ -10,9 +10,9 @@ from typing import Protocol
 from healthcare.encryption import decrypt_record, encrypt_record, key_from_bits
 from healthcare.requests import HealthcareRequest, Priority
 from key_management.pool import KeyPool
-from key_management.replenishment import AdaptiveReplenishment
+from key_management.replenishment import AdaptiveReplenishment, ReplenishmentConfig
 from qkd.pipeline import BB84Batch, run_bb84_batch
-from scheduling.fd_qks import QueuePolicy, schedule_requests
+from scheduling.fd_qks import QueuePolicy, effective_priority, schedule_requests
 
 
 class GenerationPolicy(StrEnum):
@@ -25,6 +25,50 @@ class BatchRunner(Protocol):
     def __call__(
         self, num_qubits: int, *, seed: int, depolarizing_probability: float
     ) -> BB84Batch: ...
+
+
+class BatchStatus(StrEnum):
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    UNFINISHED = "unfinished"
+
+
+@dataclass(frozen=True)
+class BatchTrace:
+    batch_id: int
+    batch_seed: int
+    qubits: int
+    started_at: int
+    scheduled_completion: int
+    status: BatchStatus = BatchStatus.UNFINISHED
+    completed_at: int | None = None
+    cancelled_at: int | None = None
+    sampled_qber: float | None = None
+    estimated_bits: int | None = None
+    output_bits: int | None = None
+    admitted_bits: int = 0
+    rejection_reason: str | None = None
+    pool_at_start: int = 0
+    pool_before: int = 0
+    pool_after: int = 0
+    reserve_bits: int = 0
+
+
+@dataclass(frozen=True)
+class RequestTrace:
+    request_id: str
+    priority: str
+    arrival: float
+    deadline: float
+    effective_priority: int
+    allocation_time: float | None
+    completion_time: float | None
+    reason: str | None
+    pool_before: int
+    pool_after: int
+    reserve_bits: int
+    allocation_id: int | None = None
+    outcome_at: float | None = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +86,12 @@ class SimulationResult:
     generated_bits: int
     wasted_bits: int
     remaining_bits: int
+    requests: tuple[RequestTrace, ...]
+    batches: tuple[BatchTrace, ...]
+    unresolved: tuple[HealthcareRequest, ...] = ()
+
+    def qubits_for(self, status: BatchStatus) -> int:
+        return sum(batch.qubits for batch in self.batches if batch.status == status)
 
 
 def simulate_requests(
@@ -57,55 +107,129 @@ def simulate_requests(
     generation_policy: GenerationPolicy = GenerationPolicy.ADAPTIVE,
     fixed_batch_qubits: int = 8192,
     batch_runner: BatchRunner = run_bb84_batch,
+    end_time: int | None = None,
+    pool_capacity_bits: int = 8192,
+    replenishment: ReplenishmentConfig = ReplenishmentConfig(),
 ) -> SimulationResult:
     """Dispatch at integer-second ticks and account for batch generation delay."""
     if type(qubit_budget) is not int or qubit_budget < 0:
         raise ValueError("qubit_budget must be a nonnegative integer")
     if type(qubits_per_second) is not int or qubits_per_second <= 0:
         raise ValueError("qubits_per_second must be a positive integer")
-    if type(fixed_batch_qubits) is not int or fixed_batch_qubits < 1024:
-        raise ValueError("fixed_batch_qubits must be an integer of at least 1024")
+    if type(fixed_batch_qubits) is not int or fixed_batch_qubits < replenishment.min_qubits:
+        raise ValueError("fixed_batch_qubits must be an integer at least as large as min_qubits")
     if any(request.required_key_bits != 256 for request in requests):
         raise ValueError("encrypted delivery requires 256-bit allocations")
     if len({request.request_id for request in requests}) != len(requests):
         raise ValueError("request IDs must be unique")
+    if any(int(value) != value for request in requests
+           for value in (request.arrival_time, request.deadline)):
+        raise ValueError("simulation request arrivals and deadlines must be whole seconds")
+    if end_time is not None and (type(end_time) is not int or end_time < 0):
+        raise ValueError("end_time must be a nonnegative integer")
 
-    pool = KeyPool(8192, reserve_bits)
-    adaptive = AdaptiveReplenishment()
+    pool = KeyPool(pool_capacity_bits, reserve_bits)
+    adaptive = AdaptiveReplenishment(replenishment)
     rng = Random(seed)
     pending = sorted(requests, key=lambda request: request.arrival_time)
     delivered = []
     missed = []
+    request_traces = []
+    batches = []
+    allocated_ids = set()
+    consumed = 0
     qubits_started = generated = wasted = 0
     in_flight = None
-    last_tick = ceil(max((request.deadline for request in requests), default=0))
+    last_tick = int(max((request.deadline for request in requests), default=0))
+    if end_time is not None:
+        last_tick = min(last_tick, end_time)
+
+    def record_unserved(request: HealthcareRequest, tick: int, reason: str) -> None:
+        priority = effective_priority(
+            request, max(tick, request.arrival_time),
+            ageing_interval if queue_policy == QueuePolicy.FD_QKS else None,
+        )
+        request_traces.append(RequestTrace(
+            request.request_id, request.priority.name.lower(), request.arrival_time,
+            request.deadline, priority, None, None, reason, pool.available_bits,
+            pool.available_bits, reserve_bits, outcome_at=tick,
+        ))
 
     for now in range(last_tick + 1):
-        if in_flight is not None and in_flight[0] == now:
-            _, qubits, batch_seed = in_flight
+        if in_flight is not None and in_flight.scheduled_completion == now:
             batch = batch_runner(
-                qubits, seed=batch_seed, depolarizing_probability=depolarizing_probability
+                in_flight.qubits, seed=in_flight.batch_seed,
+                depolarizing_probability=depolarizing_probability,
             )
             size = len(batch.amplified_bits)
-            adaptive.observe_batch(qubits, size)
+            estimate = batch.finite_key.output_length if batch.finite_key is not None else None
+            if size and (batch.agreement is not True or size != estimate):
+                raise RuntimeError("rejected or inconsistent batch supplied key material")
+            adaptive.observe_batch(in_flight.qubits, size)
             generated += size
-            wasted += size - pool.replenish(batch.amplified_bits)
+            before = pool.available_bits
+            admitted = pool.replenish(batch.amplified_bits)
+            wasted += size - admitted
+            reason = None
+            if batch.agreement is None:
+                reason = "insufficient_sifted_bits"
+            elif batch.agreement is False:
+                reason = "reconciliation_failed"
+            elif not size:
+                reason = "zero_usable_output"
+            batches.append(replace(
+                in_flight, status=BatchStatus.COMPLETED, completed_at=now,
+                sampled_qber=batch.sampled_qber, estimated_bits=estimate, output_bits=size,
+                admitted_bits=admitted, rejection_reason=reason, pool_before=before,
+                pool_after=pool.available_bits,
+            ))
             in_flight = None
 
+        stock_before_dispatch = pool.available_bits
         step = schedule_requests(
             pending, pool, now, ageing_interval=ageing_interval, policy=queue_policy
         )
         missed.extend(step.expired)
+        for request in step.expired:
+            if request.deadline >= now:
+                raise RuntimeError("request expired before its deadline")
+            record_unserved(request, now, "deadline_missed")
         for allocation in step.allocated:
             request = allocation.request
+            if request.request_id in allocated_ids:
+                raise RuntimeError("duplicate allocation")
+            if allocation.allocation_id != consumed:
+                raise RuntimeError("duplicate or out-of-order FIFO key allocation")
+            if not request.arrival_time <= allocation.time <= request.deadline:
+                raise RuntimeError("allocation outside request timing window")
+            if allocation.pool_before != stock_before_dispatch or (
+                allocation.pool_before - allocation.pool_after != request.required_key_bits
+            ):
+                raise RuntimeError("allocation stock conservation failed")
+            if not request.critical and allocation.pool_after < reserve_bits:
+                raise RuntimeError("ordinary allocation consumed the emergency reserve")
             key = key_from_bits(allocation.key_bits)
             envelope = encrypt_record(request.payload, key, request.request_id)
             if decrypt_record(envelope, key) != request.payload:
                 raise RuntimeError(f"delivery verification failed for {request.request_id}")
             delivered.append(Delivery(request.request_id, request.priority, now - request.arrival_time))
+            allocated_ids.add(request.request_id)
+            request_traces.append(RequestTrace(
+                request.request_id, request.priority.name.lower(), request.arrival_time,
+                request.deadline, allocation.effective_priority, allocation.time, now, None,
+                allocation.pool_before, allocation.pool_after, reserve_bits,
+                allocation.allocation_id, now,
+            ))
+            consumed += request.required_key_bits
+            stock_before_dispatch = allocation.pool_after
+        if stock_before_dispatch != pool.available_bits:
+            raise RuntimeError("dispatch stock conservation failed")
 
         pending = list(step.deferred)
         if not pending:
+            if in_flight is not None:
+                batches.append(replace(in_flight, status=BatchStatus.CANCELLED, cancelled_at=now))
+                in_flight = None
             break
         if in_flight is not None:
             continue
@@ -130,7 +254,32 @@ def simulate_requests(
             finish = now + ceil(qubits / qubits_per_second)
             if finish <= max(request.deadline for request in pending):
                 qubits_started += qubits
-                in_flight = (finish, qubits, rng.getrandbits(64))
+                in_flight = BatchTrace(
+                    len(batches), rng.getrandbits(64), qubits, now, finish,
+                    pool_at_start=pool.available_bits, pool_before=pool.available_bits,
+                    pool_after=pool.available_bits,
+                    reserve_bits=reserve_bits,
+                )
 
-    missed.extend(pending)
-    return SimulationResult(tuple(delivered), tuple(missed), qubits_started, generated, wasted, pool.available_bits)
+    if in_flight is not None:
+        batches.append(in_flight)
+    unresolved = []
+    for request in pending:
+        reason = "deadline_missed" if request.deadline <= last_tick else "observation_ended"
+        record_unserved(request, last_tick, reason)
+        if reason == "deadline_missed":
+            missed.append(request)
+        else:
+            unresolved.append(request)
+    if qubits_started != sum(batch.qubits for batch in batches) or qubits_started > qubit_budget:
+        raise RuntimeError("generation budget conservation failed")
+    if generated != consumed + wasted + pool.available_bits or (
+        sum(batch.admitted_bits for batch in batches) != consumed + pool.available_bits
+    ) or pool.allocated_bits != consumed:
+        raise RuntimeError("key conservation failed")
+    if len({trace.request_id for trace in request_traces}) != len(requests):
+        raise RuntimeError("request trace accounting failed")
+    return SimulationResult(
+        tuple(delivered), tuple(missed), qubits_started, generated, wasted, pool.available_bits,
+        tuple(request_traces), tuple(batches), tuple(unresolved),
+    )

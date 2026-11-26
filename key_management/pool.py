@@ -18,6 +18,12 @@ class KeyPool:
         self._capacity_bits = capacity_bits
         self._reserve_bits = emergency_reserve_bits
         self._bits: deque[int] = deque()
+        self._allocated_bits = 0
+
+    @property
+    def allocated_bits(self) -> int:
+        """Number of FIFO positions consumed since this pool was created."""
+        return self._allocated_bits
 
     @property
     def available_bits(self) -> int:
@@ -51,4 +57,6 @@ class KeyPool:
         available = self.available_bits if critical else self.ordinary_available_bits
         if bit_count > available:
             return None
-        return tuple(self._bits.popleft() for _ in range(bit_count))
+        bits = tuple(self._bits.popleft() for _ in range(bit_count))
+        self._allocated_bits += bit_count
+        return bits
