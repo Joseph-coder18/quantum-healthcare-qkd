@@ -1,0 +1,12 @@
+qiskit
+qiskit-aer
+numpy
+scipy
+simpy
+cryptography
+pandas
+matplotlib
+plotly
+streamlit
+pytest
+pylatexenc

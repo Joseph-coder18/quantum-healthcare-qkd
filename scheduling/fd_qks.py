@@ -1,0 +1,83 @@
+"""Deadline-aware allocation for the FD-QKS simulation."""
+
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from math import floor, isfinite
+
+from healthcare.requests import HealthcareRequest, Priority
+from key_management.pool import KeyPool
+
+
+class QueuePolicy(StrEnum):
+    FD_QKS = "fd-qks"
+    FCFS = "fcfs"
+    STATIC_PRIORITY = "static-priority"
+    EDF = "edf"
+
+
+@dataclass(frozen=True)
+class Allocation:
+    request: HealthcareRequest
+    time: float
+    key_bits: tuple[int, ...] = field(repr=False)
+
+
+@dataclass(frozen=True)
+class SchedulingStep:
+    allocated: tuple[Allocation, ...]
+    expired: tuple[HealthcareRequest, ...]
+    deferred: tuple[HealthcareRequest, ...]
+
+
+def schedule_requests(
+    requests: Iterable[HealthcareRequest],
+    pool: KeyPool,
+    now: float,
+    *,
+    ageing_interval: float | None = 10.0,
+    policy: QueuePolicy = QueuePolicy.FD_QKS,
+) -> SchedulingStep:
+    """Allocate eligible requests in priority, deadline, then arrival order.
+
+    A request may be served at its deadline. Future and unfunded requests are
+    returned for later steps. Disabling ageing preserves base priorities.
+    """
+    if not isfinite(now) or now < 0:
+        raise ValueError("now must be finite and nonnegative")
+    if ageing_interval is not None and (not isfinite(ageing_interval) or ageing_interval <= 0):
+        raise ValueError("ageing_interval must be positive and finite")
+
+    requests = tuple(requests)
+    if len({request.request_id for request in requests}) != len(requests):
+        raise ValueError("request IDs must be unique")
+
+    def rank(request: HealthcareRequest) -> tuple:
+        arrival_order = (request.arrival_time, request.request_id)
+        if policy == QueuePolicy.FCFS:
+            return arrival_order
+        if policy == QueuePolicy.STATIC_PRIORITY:
+            return (-request.priority, *arrival_order)
+        if policy == QueuePolicy.EDF:
+            return (request.deadline, *arrival_order)
+
+        priority = request.priority
+        if ageing_interval is not None and not request.critical:
+            wait = now - request.arrival_time
+            priority = min(Priority.URGENT, priority + floor(wait / ageing_interval))
+        return (-priority, request.deadline, *arrival_order)
+
+    expired = tuple(request for request in requests if request.deadline < now)
+    deferred = [request for request in requests if request.arrival_time > now]
+    eligible = sorted(
+        (request for request in requests if request.arrival_time <= now <= request.deadline),
+        key=rank,
+    )
+    allocated = []
+    for request in eligible:
+        bits = pool.allocate(request.required_key_bits, critical=request.critical)
+        if bits is None:
+            deferred.append(request)
+        else:
+            allocated.append(Allocation(request, now, bits))
+    return SchedulingStep(tuple(allocated), expired, tuple(deferred))
