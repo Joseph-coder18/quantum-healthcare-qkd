@@ -390,7 +390,11 @@ def scheduler_lab():
             fig.add_scatter(x=subset[field], y=subset.request_id, mode="markers", name=state,
                             marker=dict(color=color, symbol=symbol, size=9), text=subset.priority,
                             hovertemplate="%{y} · %{text}<br>%{x}s<extra></extra>")
-    fig.update_layout(xaxis_title="Simulation time (s)", yaxis_title="Synthetic request")
+    fig.update_layout(
+        xaxis_title="Simulation time (s)", yaxis_title="Synthetic request ID",
+        yaxis=dict(type="category", categoryorder="array",
+                   categoryarray=sorted(requests.request_id, reverse=True)),
+    )
     chart(fig, height=470)
     st.dataframe(requests[["request_id", "priority", "effective_priority", "arrival", "deadline",
                            "allocation_time", "wait_s", "outcome"]], hide_index=True)
@@ -412,6 +416,8 @@ def research_results():
     if data is None or intervals is None:
         return
     st.caption("Historical experiment · Phase 10 · 30 paired seeds per workload family")
+    if study == "Queue comparison":
+        st.caption("This controlled study uses fixed batch generation and a 1,024-bit reserve for every queue.")
     scenario = st.selectbox("Workload family", sorted(data.scenario.unique()), format_func=lambda item: item.replace("-", " ").title())
     subset = data[data.scenario == scenario]
     choices = sorted(subset.policy.unique())
