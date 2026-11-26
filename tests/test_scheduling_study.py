@@ -4,6 +4,7 @@ import json
 import pytest
 
 from experiments.scheduling_study import build_manifest, paired_intervals, run_study
+from experiments.verify_phase10 import verify
 from qkd.finite_key import FiniteKeyEstimate
 from qkd.pipeline import BB84Batch
 
@@ -55,6 +56,7 @@ def test_controlled_study_round_trips_manifest_and_trace_outputs(tmp_path):
         assert len(reader.fieldnames) == len(set(reader.fieldnames))
     assert {row["seed"] for row in batch_rows} == {"42", "43"}
     assert all(int(row["batch_seed"]) != int(row["seed"]) for row in batch_rows)
+    assert verify(original) == (8, 288, len(batch_rows))
     for row in rows:
         assert int(row["qubits_started"]) == sum(
             int(row[f"qubits_{status}"]) for status in ("completed", "cancelled", "unfinished")

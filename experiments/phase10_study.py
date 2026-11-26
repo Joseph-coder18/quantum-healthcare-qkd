@@ -2,7 +2,8 @@
 
 import argparse
 import csv
-from dataclasses import asdict
+import json
+from dataclasses import asdict, replace
 from pathlib import Path
 from random import Random
 
@@ -78,7 +79,8 @@ def workload(scenario: str, seed: int) -> dict:
 
 
 def phase10_manifest(
-    split: str, *, grouped: bool = False, comparison: str = "baseline", calibration: Path | None = None,
+    split: str, *, grouped: bool = False, comparison: str = "baseline",
+    calibration: Path | None = None, selection: dict | None = None,
 ) -> dict:
     if split == "development":
         scenarios, seeds = DEVELOPMENT, DEVELOPMENT_SEEDS
@@ -90,6 +92,15 @@ def phase10_manifest(
     manifest["phase10_split"] = split
     manifest["aer_execution"] = "grouped" if grouped else "original"
     manifest["workloads"] = [workload(scenario, seed) for scenario in scenarios for seed in seeds]
+    if comparison in {"generation", "combined"}:
+        if calibration is None:
+            raise ValueError("this comparison requires a calibration CSV")
+        with calibration.open(newline="", encoding="utf-8") as source:
+            manifest["yield_calibration"] = [
+                {"qubits": int(row["qubits"]), "qber": float(row["qber"]),
+                 "usable_bits": int(row["usable_bits"])}
+                for row in csv.DictReader(source)
+            ]
     if comparison == "reserve":
         manifest["comparison"] = "phase10-reserve"
         manifest["policies"] = {
@@ -97,14 +108,6 @@ def phase10_manifest(
             "dynamic-reserve": asdict(Policy(dynamic_reserve=DynamicReserveConfig())),
         }
     elif comparison == "generation":
-        if calibration is None:
-            raise ValueError("the generation comparison requires a calibration CSV")
-        with calibration.open(newline="", encoding="utf-8") as source:
-            manifest["yield_calibration"] = [
-                {"qubits": int(row["qubits"]), "qber": float(row["qber"]),
-                 "usable_bits": int(row["usable_bits"])}
-                for row in csv.DictReader(source)
-            ]
         manifest["comparison"] = "phase10-generation"
         manifest["policies"] = {
             "fd-qks": asdict(Policy()),
@@ -117,6 +120,28 @@ def phase10_manifest(
         manifest["policies"]["deadline-sensitive"] = asdict(Policy(
             queue=QueuePolicy.DEADLINE_SENSITIVE, generation=GenerationPolicy.FIXED, ageing=None,
         ))
+    elif comparison == "combined":
+        if selection is None:
+            raise ValueError("combined evaluation requires a frozen development selection")
+        candidates = {
+            "dynamic-reserve": {"dynamic_reserve": DynamicReserveConfig()},
+            "deadline-generation": {"generation": GenerationPolicy.DEADLINE_AWARE},
+            "deadline-sensitive": {"queue": QueuePolicy.DEADLINE_SENSITIVE, "ageing": None},
+        }
+        selected = selection["components"]
+        if len(set(selected)) != len(selected) or not set(selected) <= candidates.keys():
+            raise ValueError("selection must name distinct known components")
+        manifest["comparison"] = "phase10-combined"
+        manifest["selection"] = selection
+        base = Policy()
+        settings = {key: value for name in selected for key, value in candidates[name].items()}
+        manifest["policies"]["combined-v2"] = asdict(replace(base, **settings))
+        for name, component in candidates.items():
+            manifest["policies"][name] = asdict(replace(base, **component))
+            if name in selected:
+                manifest["policies"][f"combined-without-{name}"] = asdict(replace(base, **{
+                    key: value for key, value in settings.items() if key not in component
+                }))
     elif comparison != "baseline":
         raise ValueError("unknown Phase 10 comparison")
     return manifest
@@ -126,13 +151,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", choices=("development", "held-out"), required=True)
     parser.add_argument("--grouped", action="store_true")
-    parser.add_argument("--comparison", choices=("baseline", "reserve", "generation", "queue"),
+    parser.add_argument("--comparison", choices=("baseline", "reserve", "generation", "queue", "combined"),
                         default="baseline")
     parser.add_argument("--calibration", type=Path)
+    parser.add_argument("--selection", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     run_study(args.output_dir, phase10_manifest(
         args.split, grouped=args.grouped, comparison=args.comparison, calibration=args.calibration,
+        selection=json.loads(args.selection.read_text(encoding="utf-8")) if args.selection else None,
     ))
 
 

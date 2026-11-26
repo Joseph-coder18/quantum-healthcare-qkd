@@ -1,0 +1,842 @@
+{
+  "schema_version": 1,
+  "comparison": "legacy-scarcity-bridge",
+  "engine": {
+    "qubits_per_second": 4096,
+    "fixed_batch_qubits": 8192,
+    "pool_capacity_bits": 8192
+  },
+  "replenishment": {
+    "low_watermark": 2048,
+    "high_watermark": 6144,
+    "min_qubits": 1024,
+    "max_qubits": 8192,
+    "qubit_increment": 1024,
+    "initial_yield": 0.12,
+    "smoothing": 0.5
+  },
+  "policies": {
+    "fd-qks": {
+      "queue": "fd-qks",
+      "generation": "adaptive",
+      "reserve": 1024,
+      "ageing": 10.0,
+      "dynamic_reserve": null
+    }
+  },
+  "workloads": [
+    {
+      "scenario": "scarcity",
+      "seed": 42,
+      "qubit_budget": 40960,
+      "depolarizing_probability": 0.0,
+      "requests": [
+        {
+          "request_id": "000",
+          "arrival_time": 1,
+          "deadline": 11,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "001",
+          "arrival_time": 15,
+          "deadline": 25,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "002",
+          "arrival_time": 47,
+          "deadline": 107,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "003",
+          "arrival_time": 47,
+          "deadline": 167,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "004",
+          "arrival_time": 5,
+          "deadline": 15,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "005",
+          "arrival_time": 2,
+          "deadline": 62,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "006",
+          "arrival_time": 13,
+          "deadline": 133,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "007",
+          "arrival_time": 38,
+          "deadline": 98,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "008",
+          "arrival_time": 12,
+          "deadline": 132,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "009",
+          "arrival_time": 44,
+          "deadline": 54,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "010",
+          "arrival_time": 14,
+          "deadline": 74,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "011",
+          "arrival_time": 17,
+          "deadline": 77,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "012",
+          "arrival_time": 0,
+          "deadline": 10,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "013",
+          "arrival_time": 10,
+          "deadline": 20,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "014",
+          "arrival_time": 21,
+          "deadline": 31,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "015",
+          "arrival_time": 13,
+          "deadline": 73,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "016",
+          "arrival_time": 21,
+          "deadline": 23,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "017",
+          "arrival_time": 24,
+          "deadline": 144,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "018",
+          "arrival_time": 22,
+          "deadline": 142,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "019",
+          "arrival_time": 2,
+          "deadline": 12,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "020",
+          "arrival_time": 34,
+          "deadline": 44,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "021",
+          "arrival_time": 24,
+          "deadline": 144,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "022",
+          "arrival_time": 18,
+          "deadline": 138,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "023",
+          "arrival_time": 39,
+          "deadline": 49,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "024",
+          "arrival_time": 23,
+          "deadline": 33,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "025",
+          "arrival_time": 45,
+          "deadline": 105,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "026",
+          "arrival_time": 42,
+          "deadline": 162,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "027",
+          "arrival_time": 18,
+          "deadline": 78,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "028",
+          "arrival_time": 14,
+          "deadline": 16,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "029",
+          "arrival_time": 24,
+          "deadline": 34,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "030",
+          "arrival_time": 40,
+          "deadline": 100,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "031",
+          "arrival_time": 10,
+          "deadline": 20,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "032",
+          "arrival_time": 13,
+          "deadline": 73,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "033",
+          "arrival_time": 44,
+          "deadline": 54,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "034",
+          "arrival_time": 41,
+          "deadline": 43,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "035",
+          "arrival_time": 40,
+          "deadline": 160,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        }
+      ]
+    },
+    {
+      "scenario": "scarcity",
+      "seed": 43,
+      "qubit_budget": 40960,
+      "depolarizing_probability": 0.0,
+      "requests": [
+        {
+          "request_id": "000",
+          "arrival_time": 44,
+          "deadline": 164,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "001",
+          "arrival_time": 29,
+          "deadline": 39,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "002",
+          "arrival_time": 44,
+          "deadline": 104,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "003",
+          "arrival_time": 29,
+          "deadline": 39,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "004",
+          "arrival_time": 38,
+          "deadline": 98,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "005",
+          "arrival_time": 27,
+          "deadline": 147,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "006",
+          "arrival_time": 39,
+          "deadline": 99,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "007",
+          "arrival_time": 35,
+          "deadline": 45,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "008",
+          "arrival_time": 27,
+          "deadline": 37,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "009",
+          "arrival_time": 3,
+          "deadline": 63,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "010",
+          "arrival_time": 7,
+          "deadline": 17,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "011",
+          "arrival_time": 6,
+          "deadline": 66,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "012",
+          "arrival_time": 31,
+          "deadline": 151,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "013",
+          "arrival_time": 24,
+          "deadline": 144,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "014",
+          "arrival_time": 32,
+          "deadline": 92,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "015",
+          "arrival_time": 11,
+          "deadline": 71,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "016",
+          "arrival_time": 3,
+          "deadline": 63,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "017",
+          "arrival_time": 11,
+          "deadline": 71,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "018",
+          "arrival_time": 10,
+          "deadline": 12,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "019",
+          "arrival_time": 4,
+          "deadline": 64,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "020",
+          "arrival_time": 6,
+          "deadline": 66,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "021",
+          "arrival_time": 37,
+          "deadline": 39,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "022",
+          "arrival_time": 41,
+          "deadline": 51,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "023",
+          "arrival_time": 6,
+          "deadline": 16,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "024",
+          "arrival_time": 29,
+          "deadline": 39,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "025",
+          "arrival_time": 46,
+          "deadline": 56,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "026",
+          "arrival_time": 33,
+          "deadline": 93,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "027",
+          "arrival_time": 28,
+          "deadline": 38,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "028",
+          "arrival_time": 5,
+          "deadline": 125,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "029",
+          "arrival_time": 3,
+          "deadline": 13,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "030",
+          "arrival_time": 17,
+          "deadline": 27,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "031",
+          "arrival_time": 11,
+          "deadline": 71,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "032",
+          "arrival_time": 4,
+          "deadline": 14,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "033",
+          "arrival_time": 35,
+          "deadline": 37,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "034",
+          "arrival_time": 19,
+          "deadline": 29,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "035",
+          "arrival_time": 46,
+          "deadline": 106,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        }
+      ]
+    },
+    {
+      "scenario": "scarcity",
+      "seed": 44,
+      "qubit_budget": 40960,
+      "depolarizing_probability": 0.0,
+      "requests": [
+        {
+          "request_id": "000",
+          "arrival_time": 34,
+          "deadline": 94,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "001",
+          "arrival_time": 7,
+          "deadline": 17,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "002",
+          "arrival_time": 14,
+          "deadline": 134,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "003",
+          "arrival_time": 14,
+          "deadline": 74,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "004",
+          "arrival_time": 0,
+          "deadline": 120,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "005",
+          "arrival_time": 32,
+          "deadline": 152,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "006",
+          "arrival_time": 19,
+          "deadline": 29,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "007",
+          "arrival_time": 24,
+          "deadline": 34,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "008",
+          "arrival_time": 44,
+          "deadline": 104,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "009",
+          "arrival_time": 22,
+          "deadline": 32,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "010",
+          "arrival_time": 18,
+          "deadline": 138,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "011",
+          "arrival_time": 7,
+          "deadline": 17,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "012",
+          "arrival_time": 37,
+          "deadline": 97,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "013",
+          "arrival_time": 20,
+          "deadline": 140,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "014",
+          "arrival_time": 40,
+          "deadline": 160,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "015",
+          "arrival_time": 18,
+          "deadline": 28,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "016",
+          "arrival_time": 24,
+          "deadline": 144,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "017",
+          "arrival_time": 30,
+          "deadline": 150,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "018",
+          "arrival_time": 12,
+          "deadline": 14,
+          "priority": "EMERGENCY",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "019",
+          "arrival_time": 47,
+          "deadline": 167,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "020",
+          "arrival_time": 3,
+          "deadline": 63,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "021",
+          "arrival_time": 43,
+          "deadline": 163,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "022",
+          "arrival_time": 2,
+          "deadline": 62,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "023",
+          "arrival_time": 44,
+          "deadline": 54,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "024",
+          "arrival_time": 41,
+          "deadline": 51,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "025",
+          "arrival_time": 23,
+          "deadline": 33,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "026",
+          "arrival_time": 40,
+          "deadline": 50,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "027",
+          "arrival_time": 34,
+          "deadline": 94,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "028",
+          "arrival_time": 30,
+          "deadline": 150,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "029",
+          "arrival_time": 47,
+          "deadline": 107,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "030",
+          "arrival_time": 22,
+          "deadline": 32,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "031",
+          "arrival_time": 47,
+          "deadline": 57,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "032",
+          "arrival_time": 10,
+          "deadline": 130,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "033",
+          "arrival_time": 0,
+          "deadline": 120,
+          "priority": "ADMINISTRATIVE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "034",
+          "arrival_time": 38,
+          "deadline": 98,
+          "priority": "ROUTINE",
+          "required_key_bits": 256
+        },
+        {
+          "request_id": "035",
+          "arrival_time": 34,
+          "deadline": 44,
+          "priority": "URGENT",
+          "required_key_bits": 256
+        }
+      ]
+    }
+  ],
+  "environment": {
+    "python": "3.12.3",
+    "qiskit": "2.6.2",
+    "qiskit-aer": "0.18.4",
+    "scipy": "1.18.1",
+    "cryptography": "50.0.2",
+    "lock_sha256": "88b745f1499d8156ccb6944440f5d847c62466b4472ef10f9d14f142db526c43",
+    "source_sha256": {
+      "experiments/aer_grouping.py": "b33c4ff20a859bbca29ced9cfc3a1f6fbc0e089a2a0580ad8f240c67297021e8",
+      "experiments/grouped_yield_validation.py": "761a40e73478f6b768c1b09a78699ff509f074ac4e76076c13d9486d0fdc7132",
+      "experiments/phase10_study.py": "34fbb61ea6364e4bf37f06e8283249e65be04bd7905a4c4838b91d5ccce5961a",
+      "experiments/protocol_study.py": "bb95c2c7a4556a112f1ca584bb7bfed322d9c2f9c6cd160c86de8dbbe99d056a",
+      "experiments/scheduling_study.py": "aced4666346d62b57eefeebcac64799813ca56da65babefba3b1b1867ad82b0a",
+      "experiments/yield_calibration.py": "dccbf4367c747c0c1172dfcf4e1ecaa91244ed08bccd062cd3691dff2f8b0b8a",
+      "healthcare/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "healthcare/encryption.py": "57b3eda5750556d1545cdae1e95147ff077fb9b104abcf482a5b7b189c19ed2f",
+      "healthcare/requests.py": "0fd7d0e0b3e7a302dcd2e94f75f226cbc2d3d3d2ad851952961edb0d74feaebb",
+      "key_management/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key_management/deadline_generation.py": "08afcae94b6713282a9186334506794e3637212267f12ed11b7ce239c1b7a98d",
+      "key_management/dynamic_reserve.py": "81013d505db0ca16cc2aa9af1d906ff4696fb2ef7b3bd829515c192a6d23ffc2",
+      "key_management/pool.py": "dd1d697c4e9220becae92eda3bac9368d64d19e5a85e3163f4a65c7cc3514dce",
+      "key_management/replenishment.py": "4f2f004d8d633938eaac1129526cb389475bc2e9857b317ee39d575e68d9fce0",
+      "qkd/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "qkd/bb84.py": "ae4b32eaa5ff02d9cf22b540e1cd9465ae22cf528ce6839f1c768b2ba798cf59",
+      "qkd/finite_key.py": "c99cf009deacc9a26603e044889927dd9bd5d4bdafcaba0407ae0f886e0d70d4",
+      "qkd/pipeline.py": "320798c81d2aa9e6e89b2f399b97d0824cec33407a5644a4bca9fe70ed101dbe",
+      "qkd/privacy_amplification.py": "417c2d4ac47aea94bfc45753f18a351f73528e087e94029f8db5a6d478f0c85f",
+      "qkd/reconciliation.py": "f3f8151b4131498d5d7cc1d1992253b8ddc8335ad5d727da5c73194bd480308a",
+      "scheduling/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scheduling/fd_qks.py": "e894d8594ebe2070f8a3a82065fd7900dfd5865f185077b400c21d3ad087f802",
+      "scheduling/simulation.py": "b5da3ae5a5decd2a5287bca29a5f06098933c0ddb4a3b998a3188d322cc60975"
+    }
+  }
+}

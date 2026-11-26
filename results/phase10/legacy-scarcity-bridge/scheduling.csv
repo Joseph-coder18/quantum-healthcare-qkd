@@ -1,0 +1,16 @@
+scenario,seed,policy,priority,offered,delivered,missed,mean_wait_seconds,maximum_wait_seconds,qubit_budget,qubits_started,qubits_completed,qubits_cancelled,qubits_unfinished,generated_bits,wasted_bits,remaining_bits,initial_pool_bits,reserve_bits_used
+scarcity,42,fd-qks,all,36,23,13,0.3913,3,40960,40960,40960,0,0,6745,0,857,0,167
+scarcity,42,fd-qks,administrative,9,4,5,0,0,40960,40960,40960,0,0,6745,0,857,0,0
+scarcity,42,fd-qks,routine,10,6,4,0.3333,2,40960,40960,40960,0,0,6745,0,857,0,0
+scarcity,42,fd-qks,urgent,14,10,4,0.7,3,40960,40960,40960,0,0,6745,0,857,0,0
+scarcity,42,fd-qks,emergency,3,3,0,0,0,40960,40960,40960,0,0,6745,0,857,0,167
+scarcity,43,fd-qks,all,36,24,12,0.0833,1,40960,40960,40960,0,0,6768,0,624,0,400
+scarcity,43,fd-qks,administrative,5,3,2,0,0,40960,40960,40960,0,0,6768,0,624,0,0
+scarcity,43,fd-qks,routine,14,8,6,0.25,1,40960,40960,40960,0,0,6768,0,624,0,0
+scarcity,43,fd-qks,urgent,14,10,4,0,0,40960,40960,40960,0,0,6768,0,624,0,0
+scarcity,43,fd-qks,emergency,3,3,0,0,0,40960,40960,40960,0,0,6768,0,624,0,400
+scarcity,44,fd-qks,all,36,22,14,0.4091,4,40960,40960,40960,0,0,6900,0,1268,0,0
+scarcity,44,fd-qks,administrative,13,10,3,0.8,4,40960,40960,40960,0,0,6900,0,1268,0,0
+scarcity,44,fd-qks,routine,9,3,6,0.3333,1,40960,40960,40960,0,0,6900,0,1268,0,0
+scarcity,44,fd-qks,urgent,13,8,5,0,0,40960,40960,40960,0,0,6900,0,1268,0,0
+scarcity,44,fd-qks,emergency,1,1,0,0,0,40960,40960,40960,0,0,6900,0,1268,0,0

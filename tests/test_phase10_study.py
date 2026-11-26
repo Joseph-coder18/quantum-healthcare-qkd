@@ -1,4 +1,5 @@
 from experiments.phase10_study import phase10_manifest, workload
+from experiments.phase10_metrics import _metrics
 from healthcare.requests import HealthcareRequest, Priority
 from qkd.finite_key import FiniteKeyEstimate
 from qkd.pipeline import BB84Batch
@@ -39,3 +40,37 @@ def test_batches_retain_channel_at_start_and_initial_stock_is_conserved():
     assert 256 + result.generated_bits == (
         256 * len(result.delivered) + result.remaining_bits + result.wasted_bits
     )
+
+
+def test_phase10_metrics_keep_deadline_misses_out_of_served_waits():
+    requests = [
+        {"priority": "emergency", "arrival": "0", "completion_time": "0",
+         "reason": "", "reserve_bits_used": "256"},
+        {"priority": "routine", "arrival": "0", "completion_time": "4",
+         "reason": "", "reserve_bits_used": "0"},
+        {"priority": "routine", "arrival": "0", "completion_time": "",
+         "reason": "deadline_missed", "reserve_bits_used": "0"},
+    ]
+    runs = [{"qubits_started": "8192", "qubits_completed": "4096", "remaining_bits": "256"}]
+    result = _metrics(requests, runs)
+    assert result["delivered"] == 2
+    assert result["served_wait_p50"] == 2
+    assert result["served_wait_p90"] == 3.6
+    assert result["low_priority_expiry_rate"] == 0.5
+    assert result["reserve_bits_used"] == 256
+    assert result["started_qubits_per_delivery"] == 4096
+
+
+def test_combined_manifest_has_a_paired_ablation_for_each_selected_component(tmp_path):
+    calibration = tmp_path / "calibration.csv"
+    calibration.write_text("qubits,qber,usable_bits\n4096,0.01,400\n")
+    manifest = phase10_manifest(
+        "held-out", grouped=True, comparison="combined", calibration=calibration,
+        selection={"components": ["deadline-generation", "deadline-sensitive"]},
+    )
+    policies = manifest["policies"]
+    assert policies["combined-v2"]["queue"] == "deadline-sensitive"
+    assert policies["combined-v2"]["generation"] == "deadline-aware"
+    assert policies["combined-without-deadline-generation"]["generation"] == "adaptive"
+    assert policies["combined-without-deadline-sensitive"]["queue"] == "fd-qks"
+    assert len({workload["seed"] for workload in manifest["workloads"]}) == 30

@@ -1,0 +1,11 @@
+scenario,policy,priority,offered,delivered,deadline_missed,delivery_rate,low_priority_expiry_rate,reserve_bits_used,served_wait_p50,served_wait_p90,remaining_bits,qubits_started,qubits_completed,started_qubits_per_delivery,completed_qubits_per_delivery
+all-scenarios,fd-qks,administrative,27,17,10,0.6296296296296297,0.37037037037037035,0,0.0,1.6,,,,,
+all-scenarios,fd-qks,all,108,69,39,0.6388888888888888,0.43333333333333335,567,0.0,1.0,2749,122880,122880,1780.8695652173913,1780.8695652173913
+all-scenarios,fd-qks,emergency,7,7,0,1.0,,567,0.0,0.0,,,,,
+all-scenarios,fd-qks,routine,33,17,16,0.5151515151515151,0.48484848484848486,0,0.0,1.0,,,,,
+all-scenarios,fd-qks,urgent,41,28,13,0.6829268292682927,,0,0.0,0.6,,,,,
+scarcity,fd-qks,administrative,27,17,10,0.6296296296296297,0.37037037037037035,0,0.0,1.6,,,,,
+scarcity,fd-qks,all,108,69,39,0.6388888888888888,0.43333333333333335,567,0.0,1.0,2749,122880,122880,1780.8695652173913,1780.8695652173913
+scarcity,fd-qks,emergency,7,7,0,1.0,,567,0.0,0.0,,,,,
+scarcity,fd-qks,routine,33,17,16,0.5151515151515151,0.48484848484848486,0,0.0,1.0,,,,,
+scarcity,fd-qks,urgent,41,28,13,0.6829268292682927,,0,0.0,0.6,,,,,
