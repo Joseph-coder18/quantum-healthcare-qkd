@@ -85,6 +85,40 @@ execution remains the default for studies and reproducing v1 results.
 All healthcare payloads are synthetic. The finite-key output measures usable
 key material under the simulation's engineering assumptions.
 
+## Run the dashboard
+
+From the repository root, with the virtual environment activated:
+
+```sh
+python -m streamlit run app.py --server.headless true
+```
+
+Open `http://127.0.0.1:8501`. The project binds Streamlit to loopback. Use a
+different `--server.port` if needed. The dashboard requires no credential or
+real medical record. Press Ctrl+C in the launch terminal to stop it.
+
+For a walkthrough, use the default settings in **Quantum Lab** and run
+BB84. In **Scheduler Lab**, run the simultaneous workload with stabilized
+FD-QKS v1 and then open **Key Management** to inspect its shared run
+ledger. A one-second observation cutoff in the separate pool demo shows
+how unfinished generation still charges the budget. **Healthcare Transfer**
+generates a fresh simulated BB84 batch, allocates 256 bits if available and
+shows the AES-GCM ciphertext and verified synthetic plaintext. Its modified
+copy demonstrates authentication failure. Raw key material stays in the
+local simulation. **Research Results** offers saved comparisons, paired
+intervals and CSV downloads.
+
+Live runs use grouped Aer and cap a Quantum Lab batch at 8,192 qubits
+and a Scheduler Lab run at 32,768 qubits. Scheduler and pool views share the
+latest run in the current dashboard session. Historical measurements and
+theoretical values have separate labels. Experimental v2 is explicit opt-in.
+
+Run `python -m pytest -q` and `python -m pip check` for verification. The
+[consolidated results](report/Consolidated_Results.md) document figure
+sources and analysis. Regenerate the figures and tables with
+`python -m experiments.final_figures`. The [engineering baseline](report/Final_Engineering_Baseline.md)
+describes the selected algorithm and the simulator's security boundaries.
+
 ## Phase 10 research experiments
 
 The development split uses seeds 2000–2029 across five synthetic workload
